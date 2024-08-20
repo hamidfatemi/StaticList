@@ -1,0 +1,109 @@
+{
+    "name": "add_predict_column",
+    "properties": {
+        "type": "MappingDataFlow",
+        "typeProperties": {
+            "sources": [
+                {
+                    "dataset": {
+                        "referenceName": "UoMEveryAngle",
+                        "type": "DatasetReference"
+                    },
+                    "name": "UoMEveryAngel"
+                }
+            ],
+            "sinks": [],
+            "transformations": [
+                {
+                    "name": "AddingTwoColumns"
+                },
+                {
+                    "name": "Rename"
+                },
+                {
+                    "name": "aggregate1"
+                },
+                {
+                    "name": "Rename2"
+                },
+                {
+                    "name": "ReplaceColumn"
+                },
+                {
+                    "name": "FilterColumns"
+                },
+                {
+                    "name": "FilterRow"
+                },
+                {
+                    "name": "RowFilter2"
+                },
+                {
+                    "name": "PCAalsAltUoM"
+                },
+                {
+                    "name": "join1"
+                }
+            ],
+            "scriptLines": [
+                "source(output(",
+                "          {Source.Name} as string,",
+                "          {MATERIAL ·} as string,",
+                "          {Material Description English (MATERIAL)} as string,",
+                "          {Material Type (MATERIAL)} as string,",
+                "          Numerator as string,",
+                "          {Base Unit of Measure (MATERIAL)} as string,",
+                "          Denominator as string,",
+                "          {Alternative Unit of Measure} as string,",
+                "          {Stacking factor} as string",
+                "     ),",
+                "     allowSchemaDrift: true,",
+                "     validateSchema: false,",
+                "     ignoreNoFilesFound: false) ~> UoMEveryAngel",
+                "UoMEveryAngel derive(prediction = toInteger(Numerator)+toInteger(Denominator)) ~> AddingTwoColumns",
+                "AddingTwoColumns select(mapColumn(",
+                "          {Source.Name},",
+                "          {MATERIAL ·},",
+                "          {Material Description English (MATERIAL)},",
+                "          {Material Type (MATERIAL)},",
+                "          Numerator,",
+                "          {Base Unit of Measure (MATERIAL)},",
+                "          Denominator,",
+                "          {Alternative Unit of Measure},",
+                "          {Stacking factor},",
+                "          prediction",
+                "     ),",
+                "     skipDuplicateMapInputs: true,",
+                "     skipDuplicateMapOutputs: true) ~> Rename",
+                "Rename aggregate(groupBy({MATERIAL ·})) ~> aggregate1",
+                "aggregate1 select(mapColumn(",
+                "          {MATERIAL ·}",
+                "     ),",
+                "     skipDuplicateMapInputs: true,",
+                "     skipDuplicateMapOutputs: true) ~> Rename2",
+                "UoMEveryAngel derive({Alternative Unit of Measure} = replace({Alternative Unit of Measure}, '*STA*', 'PCA')) ~> ReplaceColumn",
+                "ReplaceColumn select(mapColumn(",
+                "          {Source.Name},",
+                "          {MATERIAL ·},",
+                "          {Material Description English (MATERIAL)},",
+                "          {Material Type (MATERIAL)},",
+                "          Numerator,",
+                "          {Base Unit of Measure (MATERIAL)},",
+                "          Denominator,",
+                "          {Alternative Unit of Measure},",
+                "          {Stacking factor}",
+                "     ),",
+                "     skipDuplicateMapInputs: true,",
+                "     skipDuplicateMapOutputs: true) ~> FilterColumns",
+                "FilterColumns filter(iif({Base Unit of Measure (MATERIAL)} == {Alternative Unit of Measure}, false, true)) ~> FilterRow",
+                "FilterRow filter(!({Base Unit of Measure (MATERIAL)} == 'kg (Kilogram)' && {Alternative Unit of Measure} == 'PCA (Piece of article)') && !({Base Unit of Measure (MATERIAL)} == 't (Ton)' && {Alternative Unit of Measure} == 'PCA (Piece of article)') && !({Base Unit of Measure (MATERIAL)} == 'g (Gram)' && {Alternative Unit of Measure} == 'PCA (Piece of article)')) ~> RowFilter2",
+                "join1 filter(FilterColumns@{Base Unit of Measure (MATERIAL)} == FilterColumns@{Base Unit of Measure (MATERIAL)} && FilterColumns@{Alternative Unit of Measure} == FilterColumns@{Alternative Unit of Measure}) ~> PCAalsAltUoM",
+                "RowFilter2 join(ERROR_FUNCTION('') == ERROR_FUNCTION(''),",
+                "     joinType:'inner',",
+                "     matchType:'exact',",
+                "     ignoreSpaces: false,",
+                "     broadcast: 'auto')~> join1"
+            ]
+        }
+    }
+}
